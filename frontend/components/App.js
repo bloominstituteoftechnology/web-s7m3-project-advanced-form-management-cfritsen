@@ -1,6 +1,7 @@
 // ❗ The ✨ TASKS inside this component are NOT IN ORDER.
 // ❗ Check the README for the appropriate sequence to follow.
-import React from 'react'
+import React, {useState, useEffect} from 'react'
+import axios from 'axios'
 
 const e = { // This is a dictionary of validation error messages.
   // username
@@ -26,6 +27,25 @@ export default function App() {
   // You will need states to track (1) the form, (2) the validation errors,
   // (3) whether submit is disabled, (4) the success message from the server,
   // and (5) the failure message from the server.
+  const [form, setForm] = useState({
+    username: '',
+    favLanguage: '',
+    favFood: '',
+    agreement: false
+  })
+
+  const [error, setError] = useState({
+    username: '',
+    favLanguage: '',
+    favFood: '',
+    agreement: ''
+  })
+
+  const [disableSubmit, setDisableSubmit] = useState(true)
+
+  const [success, setSuccess] = useState('')
+
+  const [failure, setFailure] = useState('')
 
   // ✨ TASK: BUILD YOUR EFFECT HERE
   // Whenever the state of the form changes, validate it against the schema
@@ -37,6 +57,11 @@ export default function App() {
     // whether the type of event target is "checkbox" and act accordingly.
     // At every change, you should validate the updated value and send the validation
     // error to the state where we track frontend validation errors.
+    if (evt.target.type === 'checkbox'){
+      setForm({...form, agreement: !form.agreement})
+    } else {
+      setForm({...form, [evt.target.name]: evt.target.value})
+    }
   }
 
   const onSubmit = evt => {
@@ -46,18 +71,44 @@ export default function App() {
     // the form. You must put the success and failure messages from the server
     // in the states you have reserved for them, and the form
     // should be re-enabled.
+    evt.preventDefault();
+    axios.post('https://webapis.bloomtechdev.com/registration', form)
+      .then(result => {
+        console.log(result)
+        setSuccess(result.data.message)
+        setFailure('')
+        setForm({
+          username: '',
+          favLanguage: '',
+          favFood: '',
+          agreement: false
+        })
+      })
+      .catch(error => {
+        console.log(error)
+        setFailure(error.response.data.message)
+        setSuccess('')
+      })
   }
 
+  const validateStyle = {
+    success: {
+      display: `${success === '' ? 'none' : 'block'}`
+    },
+    failure: {
+      display: `${failure === '' ? 'none' : 'block'}`
+    }
+  }
   return (
     <div> {/* TASK: COMPLETE THE JSX */}
       <h2>Create an Account</h2>
-      <form>
-        <h4 className="success">Success! Welcome, new user!</h4>
-        <h4 className="error">Sorry! Username is taken</h4>
+      <form onSubmit={onSubmit} onChange={onChange}>
+        <h4 className="success" style={validateStyle.success}>{success}</h4>
+        <h4 className="error" style={validateStyle.failure}>{failure}</h4>
 
         <div className="inputGroup">
           <label htmlFor="username">Username:</label>
-          <input id="username" name="username" type="text" placeholder="Type Username" />
+          <input id="username" name="username" type="text" placeholder="Type Username" value={form.username} onChange={() => {}}/>
           <div className="validation">username is required</div>
         </div>
 
@@ -65,11 +116,11 @@ export default function App() {
           <fieldset>
             <legend>Favorite Language:</legend>
             <label>
-              <input type="radio" name="favLanguage" value="javascript" />
+              <input type="radio" name="favLanguage" value="javascript" checked={form.favLanguage === "javascript"} readOnly={true}/>
               JavaScript
             </label>
             <label>
-              <input type="radio" name="favLanguage" value="rust" />
+              <input type="radio" name="favLanguage" value="rust" checked={form.favLanguage === "rust"} readOnly={true}/>
               Rust
             </label>
           </fieldset>
@@ -78,7 +129,7 @@ export default function App() {
 
         <div className="inputGroup">
           <label htmlFor="favFood">Favorite Food:</label>
-          <select id="favFood" name="favFood">
+          <select id="favFood" name="favFood" value={form.favFood} readOnly={true}>
             <option value="">-- Select Favorite Food --</option>
             <option value="pizza">Pizza</option>
             <option value="spaghetti">Spaghetti</option>
@@ -89,7 +140,7 @@ export default function App() {
 
         <div className="inputGroup">
           <label>
-            <input id="agreement" type="checkbox" name="agreement" />
+            <input id="agreement" type="checkbox" name="agreement" checked={form.agreement} readOnly={true}/>
             Agree to our terms
           </label>
           <div className="validation">agreement is required</div>
