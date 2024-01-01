@@ -2,6 +2,7 @@
 // ❗ Check the README for the appropriate sequence to follow.
 import React, {useState, useEffect} from 'react'
 import axios from 'axios'
+import * as Yup from 'yup';
 
 const e = { // This is a dictionary of validation error messages.
   // username
@@ -18,6 +19,13 @@ const e = { // This is a dictionary of validation error messages.
   agreementRequired: 'agreement is required',
   agreementOptions: 'agreement must be accepted',
 }
+
+const schema = Yup.object().shape({
+  username: Yup.string().required(e.usernameRequired).min(3, e.usernameMin).max(20, e.usernameMax),
+  favLanguage: Yup.string().required(e.favLanguageRequired).oneOf(['javascript', 'rust'], e.favLanguageOptions),
+  favFood: Yup.string().required(e.favFoodRequired).oneOf(['pizza', 'spaghetti', 'broccoli'], e.favFoodOptions),
+  agreement: Yup.boolean().required(e.agreementRequired).oneOf([true], e.agreementOptions)
+})
 
 // ✨ TASK: BUILD YOUR FORM SCHEMA HERE
 // The schema should use the error messages contained in the object above.
@@ -50,6 +58,11 @@ export default function App() {
   // ✨ TASK: BUILD YOUR EFFECT HERE
   // Whenever the state of the form changes, validate it against the schema
   // and update the state that tracks whether the form is submittable.
+  useEffect(() => {
+    schema.isValid(form).then(isValid => {
+      setDisableSubmit(!isValid)
+    });
+  },[form])
 
   const onChange = evt => {
     // ✨ TASK: IMPLEMENT YOUR INPUT CHANGE HANDLER
@@ -57,11 +70,18 @@ export default function App() {
     // whether the type of event target is "checkbox" and act accordingly.
     // At every change, you should validate the updated value and send the validation
     // error to the state where we track frontend validation errors.
-    if (evt.target.type === 'checkbox'){
-      setForm({...form, agreement: !form.agreement})
-    } else {
-      setForm({...form, [evt.target.name]: evt.target.value})
-    }
+    let {type, checked, name, value} = evt.target;
+    
+    if (type === 'checkbox') value = checked;
+    setForm({ ...form, [name]: value })
+    Yup.reach(schema, name)
+      .validate(value)
+      .then(() => {
+        setError({ ...error, [name]: '' })
+      })
+      .catch(err => {
+        setError({ ...error, [name]: err.errors[0] })
+      });
   }
 
   const onSubmit = evt => {
@@ -72,44 +92,46 @@ export default function App() {
     // in the states you have reserved for them, and the form
     // should be re-enabled.
     evt.preventDefault();
-    axios.post('https://webapis.bloomtechdev.com/registration', form)
-      .then(result => {
-        console.log(result)
-        setSuccess(result.data.message)
-        setFailure('')
-        setForm({
-          username: '',
-          favLanguage: '',
-          favFood: '',
-          agreement: false
-        })
+    setDisableSubmit(true)
+
+    schema.validate(form)
+      .then(data => {
+        axios.post('https://webapis.bloomtechdev.com/registration', data)
+          .then(result => {
+            setSuccess(result.data.message)
+            setFailure('')
+            setForm({
+              username: '',
+              favLanguage: '',
+              favFood: '',
+              agreement: false
+            })
+          })
+          .catch(error => {
+            setFailure(error.response.data.message)
+            setSuccess('')
+            schema.isValid(form).then(isValid => {
+              setDisableSubmit(!isValid)
+            });
+          })
       })
       .catch(error => {
         console.log(error)
-        setFailure(error.response.data.message)
-        setSuccess('')
-      })
+      });
   }
-
-  const validateStyle = {
-    success: {
-      display: `${success === '' ? 'none' : 'block'}`
-    },
-    failure: {
-      display: `${failure === '' ? 'none' : 'block'}`
-    }
-  }
+    
   return (
     <div> {/* TASK: COMPLETE THE JSX */}
       <h2>Create an Account</h2>
       <form onSubmit={onSubmit} onChange={onChange}>
-        <h4 className="success" style={validateStyle.success}>{success}</h4>
-        <h4 className="error" style={validateStyle.failure}>{failure}</h4>
+        
+        {success && <h4 className="success">{success}</h4>}
+        {failure && <h4 className="error">{failure}</h4>}
 
         <div className="inputGroup">
           <label htmlFor="username">Username:</label>
           <input id="username" name="username" type="text" placeholder="Type Username" value={form.username} onChange={() => {}}/>
-          <div className="validation">username is required</div>
+          {error.username && <div className="validation">{error.username}</div>}
         </div>
 
         <div className="inputGroup">
@@ -124,7 +146,7 @@ export default function App() {
               Rust
             </label>
           </fieldset>
-          <div className="validation">favLanguage is required</div>
+          {error.favLanguage && <div className="validation">{error.favLanguage}</div>}
         </div>
 
         <div className="inputGroup">
@@ -135,7 +157,7 @@ export default function App() {
             <option value="spaghetti">Spaghetti</option>
             <option value="broccoli">Broccoli</option>
           </select>
-          <div className="validation">favFood is required</div>
+          {error.favFood && <div className="validation">{error.favFood}</div>}
         </div>
 
         <div className="inputGroup">
@@ -143,11 +165,11 @@ export default function App() {
             <input id="agreement" type="checkbox" name="agreement" checked={form.agreement} readOnly={true}/>
             Agree to our terms
           </label>
-          <div className="validation">agreement is required</div>
+          {error.agreement && <div className="validation">{error.agreement}</div>}
         </div>
 
         <div>
-          <input type="submit" disabled={false} />
+          <input type="submit" disabled={disableSubmit} />
         </div>
       </form>
     </div>
